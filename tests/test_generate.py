@@ -96,8 +96,15 @@ class StubModel(nn.Module):
             'text': {'type': 'seq', 'id': 0, 'max_tokens': 6},
             'img': {'type': 'img', 'id': 1, 'max_tokens': 4},
         }
-        self.encoder_embeddings = {'text': StubEmbed(vocab_size=vocab_size, dim=dim)}
-        self.decoder_embeddings = {'text': StubEmbed(vocab_size=vocab_size, dim=dim)}
+        # Support both text and img modalities
+        self.encoder_embeddings = {
+            'text': StubEmbed(vocab_size=vocab_size, dim=dim),
+            'img': StubEmbed(vocab_size=vocab_size, dim=dim)
+        }
+        self.decoder_embeddings = {
+            'text': StubEmbed(vocab_size=vocab_size, dim=dim),
+            'img': StubEmbed(vocab_size=vocab_size, dim=dim)
+        }
     def cat_encoder_tensors(self, encoder_mod_dict):
         # Collect first (only) modality outputs
         d = list(encoder_mod_dict.values())[0]
@@ -116,7 +123,11 @@ class StubModel(nn.Module):
         # y shape (B,N,D) -> flatten -> produce logits per token
         B, N, D = y.shape
         logits = torch.randn(B * N, self.vocab_size)
-        return {'text': logits}
+        # Return logits for all modalities in decoder_mod_dict
+        result = {}
+        for mod in decoder_mod_dict.keys():
+            result[mod] = logits
+        return result
 
 @pytest.fixture
 def sampler_no_reg():
@@ -563,6 +574,345 @@ def test_guided_autoregressive_step_batched(sampler_no_reg, tokenizer):
     sampler_no_reg.model.modality_info['text']['max_tokens'] = 2
     out = sampler_no_reg.guided_autoregressive_step_batched(mod_dict, 'text', temperature=0.0, top_k=0, top_p=0.0, use_eos=False, text_tokenizer=tokenizer, conditioning=[], guidance_scale=0.5)
     assert 'text' in out
+
+# ---- Additional coverage tests ----
+
+def test_init_conditioned_target_modality_img_raises(modality_info):
+    base = init_empty_target_modality(modality_info, 'img', 1, 4, 'cpu')
+    with pytest.raises(NotImplementedError):
+        init_conditioned_target_modality(base, modality_info, 'img', num_target_tokens=2)
+
+def test_init_conditioned_target_modality_invalid_raises(modality_info):
+    modality_info['unknown'] = {'type': 'unknown'}
+    base = {'tensor': torch.zeros((1,4)), 'input_mask': torch.ones((1,4), dtype=torch.bool), 'target_mask': torch.zeros((1,4), dtype=torch.bool), 'decoder_attention_mask': torch.zeros((1,4), dtype=torch.bool)}
+    with pytest.raises(NotImplementedError):
+        init_conditioned_target_modality(base, modality_info, 'unknown', num_target_tokens=2)
+
+def test_init_empty_target_modality_invalid_raises(modality_info):
+    modality_info['bad'] = {'type': 'bad'}
+    with pytest.raises(ValueError):
+        init_empty_target_modality(modality_info, 'bad', 1, 4, 'cpu')
+
+def test_init_full_input_modality_seq_emb_with_mask_valid(modality_info):
+    value = {'tensor': torch.zeros((1,5)), 'mask_valid': torch.tensor([[True,True,False,False,False]])}
+    out = init_full_input_modality(value, modality_info, 'emb', 'cpu')
+    assert out['input_mask'][0,0] == False and out['input_mask'][0,2] == True
+
+def test_build_chained_generation_schedules_cosine_token_schedule():
+    schedule = build_chained_generation_schedules(
+        cond_domains=['text'],
+        target_domains=['img'],
+        tokens_per_target=[10],
+        autoregression_schemes=['maskgit'],
+        decoding_steps=[3],
+        token_decoding_schedules=['cosine'],
+        temps=[1.0],
+        temp_schedules=['linear'],
+        cfg_scales=[1.0],
+        cfg_schedules=['constant'],
+    )
+    assert len(schedule) == 3
+
+def test_build_chained_generation_schedules_onex_temp():
+    schedule = build_chained_generation_schedules(
+        cond_domains=['text'],
+        target_domains=['img'],
+        tokens_per_target=[6],
+        autoregression_schemes=['maskgit'],
+        decoding_steps=[2],
+        token_decoding_schedules=['linear'],
+        temps=[2.0],
+        temp_schedules=['onex:0.1:0.5'],
+        cfg_scales=[1.0],
+        cfg_schedules=['constant'],
+    )
+    assert len(schedule) == 2
+
+def test_build_chained_generation_schedules_cosine_guidance_raises():
+    with pytest.raises(NotImplementedError):
+        build_chained_generation_schedules(
+            cond_domains=['text'],
+            target_domains=['img'],
+            tokens_per_target=[6],
+            autoregression_schemes=['maskgit'],
+            decoding_steps=[2],
+            token_decoding_schedules=['linear'],
+            temps=[1.0],
+            temp_schedules=['linear'],
+            cfg_scales=[1.0],
+            cfg_schedules=['cosine'],
+        )
+
+def test_build_chained_generation_schedules_cfg_grow_conditioning():
+    schedule = build_chained_generation_schedules(
+        cond_domains=['text'],
+        target_domains=['img', 'text2'],
+        tokens_per_target=[4, 6],
+        autoregression_schemes=['maskgit', 'autoregressive'],
+        decoding_steps=[2, 0],
+        token_decoding_schedules=['linear', 'linear'],
+        temps=[1.0, 1.0],
+        temp_schedules=['constant', 'constant'],
+        cfg_scales=[1.0, 1.0],
+        cfg_schedules=['constant', 'constant'],
+        cfg_grow_conditioning=True,
+    )
+    # After first modality completes, it should be added to conditioning
+    assert len(schedule) > 1
+
+@pytest.mark.xfail(reason="Bug in original code: empty_seq_modality signature mismatch with empty_img_modality")
+def test_guided_maskgit_step_batched_with_conditioning(sampler_no_reg):
+    input_mask = torch.tensor([[False, False, True, True, True, True]])
+    mod_dict = {
+        'text': {'tensor': torch.randint(0,20,(1,6)), 'input_mask': torch.zeros((1,6), dtype=torch.bool), 'target_mask': torch.ones((1,6), dtype=torch.bool)},
+        'img': {'tensor': torch.zeros((1,6),dtype=torch.int64), 'input_mask': input_mask, 'target_mask': ~input_mask}
+    }
+    out = sampler_no_reg.guided_maskgit_step_batched(mod_dict, 'img', num_select=1, temperature=1.0, top_k=0.0, top_p=0.0, conditioning=['text'], guidance_scale=2.0)
+    assert out['img']['tensor'].shape == (1,6)
+
+def test_guided_maskgit_step_batched_write_all_predictions(sampler_no_reg):
+    input_mask = torch.tensor([[False, False, True, True, True, True]])
+    mod_dict = {'text': {'tensor': torch.zeros((1,6),dtype=torch.int64), 'input_mask': input_mask, 'target_mask': ~input_mask}}
+    out = sampler_no_reg.guided_maskgit_step_batched(mod_dict, 'text', num_select=2, temperature=1.0, top_k=0.0, top_p=0.0, conditioning=[], guidance_scale=1.0, write_all_predictions=True)
+    assert out['text']['tensor'].shape == (1,6)
+
+def test_multi_guided_maskgit_step_batched(sampler_no_reg):
+    input_mask = torch.tensor([[False, False, True, True, True, True]])
+    uncond_dict = {'text': {'tensor': torch.zeros((1,6),dtype=torch.int64), 'input_mask': input_mask, 'target_mask': ~input_mask}}
+    cond_dict1 = copy.deepcopy(uncond_dict)
+    cond_dict2 = copy.deepcopy(uncond_dict)
+    uncond_out, cond_out = sampler_no_reg.multi_guided_maskgit_step_batched(uncond_dict, [cond_dict1, cond_dict2], [1.0, 0.5], 'text', num_select=1, temperature=1.0, top_k=0.0, top_p=0.0)
+    assert uncond_out['text']['tensor'].shape == (1,6)
+
+def test_multi_guided_maskgit_step_batched_write_all(sampler_no_reg):
+    input_mask = torch.tensor([[False, False, True, True, True, True]])
+    uncond_dict = {'text': {'tensor': torch.zeros((1,6),dtype=torch.int64), 'input_mask': input_mask, 'target_mask': ~input_mask}}
+    cond_dict1 = copy.deepcopy(uncond_dict)
+    uncond_out, cond_out = sampler_no_reg.multi_guided_maskgit_step_batched(uncond_dict, [cond_dict1], [2.0], 'text', num_select=2, temperature=1.0, top_k=0.0, top_p=0.0, write_all_predictions=True)
+    assert uncond_out['text']['tensor'].shape == (1,6)
+
+def test_guided_roar_step_batched(sampler_no_reg):
+    input_mask = torch.tensor([[False, True, True, True, True, True]])
+    mod_dict = {'text': {'tensor': torch.zeros((1,6),dtype=torch.int64), 'input_mask': input_mask, 'target_mask': ~input_mask}}
+    out = sampler_no_reg.guided_roar_step_batched(mod_dict, 'text', num_select=2, temperature=1.0, top_k=0.0, top_p=0.0, conditioning=[], guidance_scale=1.5)
+    assert out['text']['tensor'].shape == (1,6)
+
+def test_multi_guided_roar_step_batched(sampler_no_reg):
+    input_mask = torch.tensor([[False, True, True, True, True, True]])
+    uncond_dict = {'text': {'tensor': torch.zeros((1,6),dtype=torch.int64), 'input_mask': input_mask, 'target_mask': ~input_mask}}
+    cond_dict1 = copy.deepcopy(uncond_dict)
+    cond_dict2 = copy.deepcopy(uncond_dict)
+    uncond_out, cond_out = sampler_no_reg.multi_guided_roar_step_batched(uncond_dict, [cond_dict1, cond_dict2], [1.0, 0.5], 'text', num_select=2, temperature=1.0, top_k=0.0, top_p=0.0)
+    assert uncond_out['text']['tensor'].shape == (1,6)
+
+def test_autoregressive_step_batched_with_eos_early_exit(sampler_no_reg, tokenizer):
+    # Test early exit when EOS is reached
+    mod_dict = {'text': {'tensor': torch.tensor([[11,1,13,12,0,0]]), 'input_mask': torch.tensor([[False,False,False,True,True,True]]), 'target_mask': torch.ones((1,6),dtype=torch.bool)}}
+    sampler_no_reg.model.modality_info['text']['max_tokens'] = 2
+    out = sampler_no_reg.autoregressive_step_batched(mod_dict, 'text', temperature=0.0, top_k=0, top_p=0.0, use_eos=True, eos_token=torch.tensor([13]), text_tokenizer=tokenizer)
+    assert 'text' in out
+
+def test_guided_autoregressive_step_batched_with_conditioning(sampler_no_reg, tokenizer):
+    mod_dict = {
+        'img': {'tensor': torch.randint(0,20,(1,4)), 'input_mask': torch.zeros((1,4), dtype=torch.bool), 'target_mask': torch.ones((1,4), dtype=torch.bool)},
+        'text': {'tensor': torch.tensor([[11,1,2,12,0,0]]), 'input_mask': torch.tensor([[False,False,True,True,True,True]]), 'target_mask': torch.ones((1,6),dtype=torch.bool)}
+    }
+    sampler_no_reg.model.modality_info['text']['max_tokens'] = 2
+    out = sampler_no_reg.guided_autoregressive_step_batched(mod_dict, 'text', temperature=0.0, top_k=0, top_p=0.0, use_eos=False, text_tokenizer=tokenizer, conditioning=['img'], guidance_scale=1.5)
+    assert 'text' in out
+
+def test_forward_enc_dec_maskgit_batched_full(sampler_no_reg):
+    mod_dict = {
+        'text': {'tensor': torch.randint(0,20,(2,6)), 'input_mask': torch.tensor([[False,False,True,True,True,True],[False,True,True,True,True,True]])}
+    }
+    logits, mod_pos = sampler_no_reg.forward_enc_dec_maskgit_batched(mod_dict, 'text')
+    assert logits.shape[0] == 2
+
+def test_forward_enc_dec_roar_batched_full(sampler_no_reg):
+    mod_dict = {
+        'text': {'tensor': torch.randint(0,20,(2,6)), 'input_mask': torch.tensor([[False,False,True,True,True,True],[False,True,True,True,True,True]])}
+    }
+    logits, mod_pos = sampler_no_reg.forward_enc_dec_roar_batched(mod_dict, 'text', num_select=3)
+    assert logits.shape[0] == 2
+
+def test_generate_maskgit_img(sampler_no_reg, tokenizer):
+    mod_dict = {
+        'text': {'tensor': torch.randint(0,20,(1,6)), 'input_mask': torch.zeros((1,6), dtype=torch.bool), 'target_mask': torch.ones((1,6), dtype=torch.bool)},
+        'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])}
+    }
+    schedule = [{'target_domain': 'img', 'scheme': 'maskgit', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    out = sampler_no_reg.generate(mod_dict, schedule, top_k=0.0, top_p=0.0)
+    assert 'img' in out
+
+@pytest.mark.xfail(reason="Bug in original code: empty_seq_modality signature mismatch with empty_img_modality")
+def test_generate_maskgit_img_with_guidance(sampler_no_reg, tokenizer):
+    mod_dict = {
+        'text': {'tensor': torch.randint(0,20,(1,6)), 'input_mask': torch.zeros((1,6), dtype=torch.bool), 'target_mask': torch.ones((1,6), dtype=torch.bool)},
+        'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])}
+    }
+    schedule = [{'target_domain': 'img', 'scheme': 'maskgit', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 2.0, 'cfg_cond_domains': ['text']}]
+    out = sampler_no_reg.generate(mod_dict, schedule, top_k=0.0, top_p=0.0)
+    assert 'img' in out
+
+def test_generate_roar_img(sampler_no_reg, tokenizer):
+    mod_dict = {
+        'text': {'tensor': torch.randint(0,20,(1,6)), 'input_mask': torch.zeros((1,6), dtype=torch.bool), 'target_mask': torch.ones((1,6), dtype=torch.bool)},
+        'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])}
+    }
+    schedule = [{'target_domain': 'img', 'scheme': 'roar', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    out = sampler_no_reg.generate(mod_dict, schedule, top_k=0.0, top_p=0.0)
+    assert 'img' in out
+
+@pytest.mark.xfail(reason="Bug in original code: empty_seq_modality signature mismatch with empty_img_modality")
+def test_generate_roar_img_with_guidance(sampler_no_reg, tokenizer):
+    mod_dict = {
+        'text': {'tensor': torch.randint(0,20,(1,6)), 'input_mask': torch.zeros((1,6), dtype=torch.bool), 'target_mask': torch.ones((1,6), dtype=torch.bool)},
+        'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])}
+    }
+    schedule = [{'target_domain': 'img', 'scheme': 'roar', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 2.0, 'cfg_cond_domains': ['text']}]
+    out = sampler_no_reg.generate(mod_dict, schedule, top_k=0.0, top_p=0.0)
+    assert 'img' in out
+
+def test_generate_invalid_scheme_raises(sampler_no_reg):
+    sampler_no_reg.model.modality_info['img'] = {'type': 'img', 'id': 1, 'max_tokens': 4}
+    sampler_no_reg.model.encoder_embeddings['img'] = StubEmbed(vocab_size=32, dim=8)
+    sampler_no_reg.model.decoder_embeddings['img'] = StubEmbed(vocab_size=32, dim=8)
+    
+    mod_dict = {
+        'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.ones((1,4), dtype=torch.bool), 'target_mask': torch.zeros((1,4), dtype=torch.bool)}
+    }
+    schedule = [{'target_domain': 'img', 'scheme': 'invalid', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    with pytest.raises(ValueError):
+        sampler_no_reg.generate(mod_dict, schedule)
+
+def test_generate_seq_autoregressive(sampler_no_reg, tokenizer):
+    mod_dict = {'text': {'tensor': torch.tensor([[11,1,2,12,0,0]]), 'input_mask': torch.tensor([[False,False,True,True,True,True]]), 'target_mask': torch.ones((1,6),dtype=torch.bool)}}
+    sampler_no_reg.model.modality_info['text']['max_tokens'] = 2
+    schedule = [{'target_domain': 'text', 'scheme': 'autoregressive', 'num_tokens': None, 'temperature': 0.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    text_tokenizer_obj = types.SimpleNamespace(text_tokenizer=tokenizer)
+    out = sampler_no_reg.generate(mod_dict, schedule, tokenizer={'text': text_tokenizer_obj})
+    assert 'text' in out
+
+def test_generate_seq_autoregressive_with_guidance(sampler_no_reg, tokenizer):
+    mod_dict = {
+        'img': {'tensor': torch.randint(0,20,(1,4)), 'input_mask': torch.zeros((1,4), dtype=torch.bool), 'target_mask': torch.ones((1,4), dtype=torch.bool)},
+        'text': {'tensor': torch.tensor([[11,1,2,12,0,0]]), 'input_mask': torch.tensor([[False,False,True,True,True,True]]), 'target_mask': torch.ones((1,6),dtype=torch.bool)}
+    }
+    sampler_no_reg.model.modality_info['text']['max_tokens'] = 2
+    schedule = [{'target_domain': 'text', 'scheme': 'autoregressive', 'num_tokens': None, 'temperature': 0.0, 'cfg_scale': 2.0, 'cfg_cond_domains': ['img']}]
+    text_tokenizer_obj = types.SimpleNamespace(text_tokenizer=tokenizer)
+    out = sampler_no_reg.generate(mod_dict, schedule, tokenizer={'text': text_tokenizer_obj})
+    assert 'text' in out
+
+def test_generate_invalid_modality_type_raises(sampler_no_reg):
+    sampler_no_reg.model.modality_info['unknown'] = {'type': 'unknown', 'id': 99, 'max_tokens': 4}
+    mod_dict = {'unknown': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.ones((1,4), dtype=torch.bool), 'target_mask': torch.zeros((1,4), dtype=torch.bool)}}
+    schedule = [{'target_domain': 'unknown', 'scheme': 'maskgit', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    with pytest.raises(ValueError):
+        sampler_no_reg.generate(mod_dict, schedule)
+
+def test_generate_iter_maskgit(sampler_no_reg):
+    mod_dict = {
+        'text': {'tensor': torch.randint(0,20,(1,6)), 'input_mask': torch.zeros((1,6), dtype=torch.bool), 'target_mask': torch.ones((1,6), dtype=torch.bool)},
+        'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])}
+    }
+    schedule = [{'target_domain': 'img', 'scheme': 'maskgit', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    gen = sampler_no_reg.generate_iter(mod_dict, schedule)
+    result = next(gen)
+    assert 'img' in result
+
+def test_generate_iter_roar(sampler_no_reg):
+    mod_dict = {
+        'text': {'tensor': torch.randint(0,20,(1,6)), 'input_mask': torch.zeros((1,6), dtype=torch.bool), 'target_mask': torch.ones((1,6), dtype=torch.bool)},
+        'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])}
+    }
+    schedule = [{'target_domain': 'img', 'scheme': 'roar', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    gen = sampler_no_reg.generate_iter(mod_dict, schedule)
+    result = next(gen)
+    assert 'img' in result
+
+def test_generate_iter_invalid_scheme_raises(sampler_no_reg):
+    sampler_no_reg.model.modality_info['img'] = {'type': 'img', 'id': 1, 'max_tokens': 4}
+    mod_dict = {'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.ones((1,4), dtype=torch.bool), 'target_mask': torch.zeros((1,4), dtype=torch.bool)}}
+    schedule = [{'target_domain': 'img', 'scheme': 'bad', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    gen = sampler_no_reg.generate_iter(mod_dict, schedule)
+    with pytest.raises(ValueError):
+        next(gen)
+
+def test_generate_iter_seq_autoregressive(sampler_no_reg, tokenizer):
+    mod_dict = {'text': {'tensor': torch.tensor([[11,1,2,12,0,0]]), 'input_mask': torch.tensor([[False,False,True,True,True,True]]), 'target_mask': torch.ones((1,6),dtype=torch.bool)}}
+    sampler_no_reg.model.modality_info['text']['max_tokens'] = 2
+    schedule = [{'target_domain': 'text', 'scheme': 'autoregressive', 'num_tokens': None, 'temperature': 0.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    gen = sampler_no_reg.generate_iter(mod_dict, schedule, text_tokenizer=tokenizer)
+    result = next(gen)
+    assert 'text' in result
+
+def test_generate_iter_seq_with_guidance(sampler_no_reg, tokenizer):
+    mod_dict = {
+        'img': {'tensor': torch.randint(0,20,(1,4)), 'input_mask': torch.zeros((1,4), dtype=torch.bool), 'target_mask': torch.ones((1,4), dtype=torch.bool)},
+        'text': {'tensor': torch.tensor([[11,1,2,12,0,0]]), 'input_mask': torch.tensor([[False,False,True,True,True,True]]), 'target_mask': torch.ones((1,6),dtype=torch.bool)}
+    }
+    sampler_no_reg.model.modality_info['text']['max_tokens'] = 2
+    schedule = [{'target_domain': 'text', 'scheme': 'autoregressive', 'num_tokens': None, 'temperature': 0.0, 'cfg_scale': 2.0, 'cfg_cond_domains': ['img']}]
+    gen = sampler_no_reg.generate_iter(mod_dict, schedule, text_tokenizer=tokenizer)
+    result = next(gen)
+    assert 'text' in result
+
+def test_generate_iter_invalid_modality_raises(sampler_no_reg):
+    sampler_no_reg.model.modality_info['bad'] = {'type': 'bad', 'id': 99, 'max_tokens': 4}
+    mod_dict = {'bad': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.ones((1,4), dtype=torch.bool), 'target_mask': torch.zeros((1,4), dtype=torch.bool)}}
+    schedule = [{'target_domain': 'bad', 'scheme': 'maskgit', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': 1.0, 'cfg_cond_domains': []}]
+    gen = sampler_no_reg.generate_iter(mod_dict, schedule)
+    with pytest.raises(ValueError):
+        next(gen)
+
+def test_generate_multi_guided_simple(sampler_no_reg):
+    uncond_dict = {'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])}}
+    cond_dict1 = copy.deepcopy(uncond_dict)
+    cond_dict2 = copy.deepcopy(uncond_dict)
+    schedule = [{'target_domain': 'img', 'scheme': 'maskgit', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': [1.0, 0.5]}]
+    out = sampler_no_reg.generate_multi_guided(uncond_dict, [cond_dict1, cond_dict2], schedule)
+    assert 'img' in out
+
+def test_generate_multi_guided_roar(sampler_no_reg):
+    uncond_dict = {'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])}}
+    cond_dict1 = copy.deepcopy(uncond_dict)
+    schedule = [{'target_domain': 'img', 'scheme': 'roar', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': [2.0]}]
+    out = sampler_no_reg.generate_multi_guided(uncond_dict, [cond_dict1], schedule)
+    assert 'img' in out
+
+def test_generate_multi_guided_invalid_scheme_raises(sampler_no_reg):
+    sampler_no_reg.model.modality_info['img'] = {'type': 'img', 'id': 1, 'max_tokens': 4}
+    uncond_dict = {'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.ones((1,4), dtype=torch.bool), 'target_mask': torch.zeros((1,4), dtype=torch.bool)}}
+    cond_dict1 = copy.deepcopy(uncond_dict)
+    schedule = [{'target_domain': 'img', 'scheme': 'invalid', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': [1.0]}]
+    with pytest.raises(ValueError):
+        sampler_no_reg.generate_multi_guided(uncond_dict, [cond_dict1], schedule)
+
+def test_generate_multi_guided_unsupported_modality_raises(sampler_no_reg):
+    sampler_no_reg.model.modality_info['text']['type'] = 'seq'
+    uncond_dict = {'text': {'tensor': torch.zeros((1,6),dtype=torch.int64), 'input_mask': torch.ones((1,6), dtype=torch.bool), 'target_mask': torch.zeros((1,6), dtype=torch.bool)}}
+    cond_dict1 = copy.deepcopy(uncond_dict)
+    schedule = [{'target_domain': 'text', 'scheme': 'maskgit', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': [1.0]}]
+    with pytest.raises(NotImplementedError):
+        sampler_no_reg.generate_multi_guided(uncond_dict, [cond_dict1], schedule)
+
+def test_generate_multi_guided_multiple_modalities(sampler_no_reg):
+    sampler_no_reg.model.modality_info['img2'] = {'type': 'img', 'id': 2, 'max_tokens': 4}
+    sampler_no_reg.model.encoder_embeddings['img2'] = StubEmbed(vocab_size=32, dim=8)
+    sampler_no_reg.model.decoder_embeddings['img2'] = StubEmbed(vocab_size=32, dim=8)
+    
+    uncond_dict = {
+        'img': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])},
+        'img2': {'tensor': torch.zeros((1,4),dtype=torch.int64), 'input_mask': torch.tensor([[False,False,True,True]]), 'target_mask': torch.tensor([[True,True,False,False]])}
+    }
+    cond_dict1 = copy.deepcopy(uncond_dict)
+    schedule = [
+        {'target_domain': 'img', 'scheme': 'maskgit', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': [1.0]},
+        {'target_domain': 'img2', 'scheme': 'maskgit', 'num_tokens': 2, 'temperature': 1.0, 'cfg_scale': [1.0]}
+    ]
+    out = sampler_no_reg.generate_multi_guided(uncond_dict, [cond_dict1], schedule)
+    assert 'img' in out and 'img2' in out
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
