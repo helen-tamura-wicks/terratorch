@@ -15,7 +15,7 @@ all_tests=$(cd "$TEST_DIR" && \
   pytest --collect-only -q "$TEST_FILE" 2>/dev/null | \
   grep -E '^integrationtests/test_base_set\.py::' || true)
 
-echo $all_tests
+echo "$all_tests"
 
 for test in $all_tests; do
     # Normalize name (pytest nodeid may include "::class::test_func")
