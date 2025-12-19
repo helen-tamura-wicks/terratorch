@@ -1,11 +1,17 @@
 #!/bin/bash
 # run_lsf_integrationtest.sh
 # Run each test (either file or individual test function) in separate LSF jobs with coverage + logs.
+#
+# Environment variables:
+#   TEST_DIR    - Base directory for tests (default: current directory or first argument)
+#   TEST_FILE   - Test file to run (default: integrationtests/test_base_set.py)
+#   VENV_PATH   - Path to Python virtual environment (default: .venv)
 
 set -euo pipefail
 
 TEST_DIR="${TEST_DIR:-${1:-$(pwd)}}"
 TEST_FILE="${1:-${TEST_FILE:-integrationtests/test_base_set.py}}"
+VENV_PATH="${VENV_PATH:-.venv}"
 LOG_DIR="$TEST_DIR/logs"
 COV_DIR="$TEST_DIR/.coverage_jobs"
 mkdir -p "$LOG_DIR" "$COV_DIR"
@@ -31,7 +37,7 @@ for test in $all_tests; do
          -J "terratorch_${job_name}" \
          -oo "$out" -eo "$err" \
          "cd $TEST_DIR && \
-          source .venv.15.12.25/bin/activate && \
+          source $VENV_PATH/bin/activate && \
           pytest -s -v $test"
 done
 
