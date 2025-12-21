@@ -14,7 +14,6 @@ trainer:
       log_graph: true
       flush_secs: 30
   callbacks:
-    - class_path: RichProgressBar
     - class_path: LearningRateMonitor
       init_args:
         logging_interval: epoch
