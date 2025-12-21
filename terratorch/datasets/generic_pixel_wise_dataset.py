@@ -98,7 +98,7 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
             reduce_zero_label (bool): Subtract 1 from all labels. Useful when labels start from 1 instead of the
                 expected 0. Defaults to False.
             tortilla_df (tortilla.DataFrame | None): Tortilla DataFrame to use for loading data. Defaults to None. If provided, data_root is ignored.
-            tortilla_indicies (list[int] | None): List of indices to use from tortilla_df. Defaults to None, which uses all indices.
+            tortilla_indicies (list[Hashable] | None): List of indices to use from tortilla_df. Defaults to None, which uses all indices.
         """
         super().__init__()
 
