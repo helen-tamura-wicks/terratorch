@@ -66,7 +66,7 @@ class CopyPasteObjectDetectionDataset(Dataset):
         return image, mask
 
     def __getitem__(self, idx):
-        image, boxes = self.base_dataset[idx]
+        image, boxes, *_ = self.base_dataset[idx]
 
         if isinstance(image, Image.Image):
             image = self.to_tensor(image)
