@@ -63,10 +63,13 @@ class CopyPasteObjectDetectionDataset(Dataset):
 
         mask[oy:oy+oh, ox:ox+ow] |= (alpha > 0.5)
 
-        return image, mask
+        bbox = torch.tensor([ox, oy, ox + ow, oy + oh], dtype=torch.float32)
+        return image, mask, bbox
 
     def __getitem__(self, idx):
-        image, boxes, *_ = self.base_dataset[idx]
+        image = self.base_dataset[idx]['image']
+        boxes = self.base_dataset[idx]['boxes']
+        labels = self.base_dataset[idx].get('labels', None)
 
         if isinstance(image, Image.Image):
             image = self.to_tensor(image)
@@ -91,9 +94,20 @@ class CopyPasteObjectDetectionDataset(Dataset):
             n = random.randint(1, self.max_objects)
             for _ in range(n):
                 obj = self._load_object()
-                image, mask = self._paste_object(image, mask, obj)
+                image, mask, bbox = self._paste_object(image, mask, obj)
+
+
+                boxes = torch.cat([boxes, bbox.unsqueeze(0)], dim=0)
+
+
+                # assuming class 1 for pasted objects
+
+
+                labels = torch.cat([labels, torch.tensor([1], dtype=torch.long)], dim=0) 
 
         return {
             "image": image.float(),
-            "mask": mask
+            "boxes": boxes,
+            "mask": mask,
+            "labels": labels
         }
