@@ -6,6 +6,8 @@ from PIL import Image
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import terratorch.visualization as ttv
+
 
 
 class CopyPasteObjectDetectionDataset(Dataset):
