@@ -115,28 +115,23 @@ class CopyPasteObjectDetectionDataset(Dataset):
         }
 
 
-def plot_predictions(images, targets, preds, max_items=4):
-    fig, axes = plt.subplots(1, max_items, figsize=(4 * max_items, 4))
-    if max_items == 1:
-        axes = [axes]
+    def plot(
+        self,
+        sample: dict[str, torch.Tensor],
+        suptitle: str | None = None,
+    ) -> plt.Figure:
+        """Plot a detection sample using terratorch helpers (TensorBoard-safe)."""
 
-    for i, ax in enumerate(axes):
-        img = images[i].detach().cpu().permute(1, 2, 0)
-        ax.imshow(img)
-        ax.axis("off")
+        fig = ttv.plot_boxes_labels(
+            image=sample["image"],
+            boxes=sample["boxes"],
+            labels=sample.get("labels"),
+            scores=sample.get("scores"),
+            class_names=getattr(self, "class_names", None),
+            show=False,          # REQUIRED for TensorBoard
+        )
 
-        for box in targets[i]["boxes"]:
-            x1, y1, x2, y2 = box.cpu()
-            ax.add_patch(plt.Rectangle(
-                (x1, y1), x2 - x1, y2 - y1,
-                fill=False, edgecolor="green", linewidth=2
-            ))
+        if suptitle:
+            fig.suptitle(suptitle)
 
-        for box in preds[i]["boxes"]:
-            x1, y1, x2, y2 = box.cpu()
-            ax.add_patch(plt.Rectangle(
-                (x1, y1), x2 - x1, y2 - y1,
-                fill=False, edgecolor="red", linewidth=2
-            ))
-
-    return fig
+        return fig
