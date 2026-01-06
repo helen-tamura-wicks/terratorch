@@ -127,9 +127,6 @@ class CopyPasteObjectDetectionDataset(Dataset):
         fig = ttv.plot_boxes_labels(
             image=sample["image"],
             boxes=sample["boxes"],
-            labels=sample.get("labels"),
-            scores=sample.get("scores"),
-            class_names=getattr(self, "class_names", None),
             show=False,          # REQUIRED for TensorBoard
         )
 
