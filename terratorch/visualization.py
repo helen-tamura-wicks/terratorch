@@ -17,8 +17,10 @@ def plot_boxes_labels(
     box_color: str = "red",
     box_linewidth: float = 2,
     font_size: int = 10,
+    ax: Optional[plt.Axes] = None,
     show: bool = True,
 ):
+
     """
     Plot an image with bounding boxes and labels.
     
@@ -72,8 +74,13 @@ def plot_boxes_labels(
         scores = scores.detach().cpu().numpy()
     
     # Create figure and axis
-    fig, ax = plt.subplots(1, figsize=figsize)
+    if ax is None:
+        fig, ax = plt.subplots(1, figsize=figsize)
+    else:
+        fig = ax.figure
+
     ax.imshow(image)
+
     
     # Plot each box
     for i, box in enumerate(boxes):
@@ -121,8 +128,9 @@ def plot_boxes_labels(
     ax.axis('off')
     plt.tight_layout()
     
-    if show:
+    if show and ax is not None:
         plt.show()
+
     
     return fig
 
