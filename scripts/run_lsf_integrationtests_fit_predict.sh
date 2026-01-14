@@ -12,27 +12,29 @@ set -euo pipefail
 
 
 TEST_DIR="/dccstor/terratorch/users/wanjiru/terratorch"
-TEST_DIR="${TEST_DIR:-${1:-$(pwd)}}"
 LOG_DIR="$TEST_DIR/logs"
 COV_DIR="$TEST_DIR/.coverage_jobs"
 VENV_PATH="/dccstor/terratorch/users/wanjiru/.wanjiru_tests/bin/activate"
-VENV_PATH="${VENV_PATH:-.venv}"
 TYPE="fit" # Or predict
 mkdir -p "$LOG_DIR" "$COV_DIR"
 
+source $VENV_PATH
 
 echo "Grabbing tests" 
-all_tests=$(cd "$TEST_DIR" && \
+all_tests_str=$(cd "$TEST_DIR" && \
   pytest --collect-only -q integrationtests/test_base_set.py 2>/dev/null | \
   grep -E '^integrationtests/test_base_set\.py::' || true)
-  
-echo "Found tests: ${#all_tests[@]} "
+
+mapfile -t all_tests <<< "$all_tests_str"
+
+echo "Found tests in array : ${#all_tests[@]}"
 
 
 
 # Removing all prior tests artifacts to makes sure the new tests 
 # run cleanly with correct terratorch version
-rm -rf /dccstor/terratorch/tmp/
+shopt -s extglob
+rm -rf /dccstor/terratorch/tmp/!("Python"*)
 
 predict_tests=()
 fit_tests=()
