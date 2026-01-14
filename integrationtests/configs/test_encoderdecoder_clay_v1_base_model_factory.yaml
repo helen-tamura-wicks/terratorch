@@ -127,11 +127,11 @@ model:
           indices: [2, 5, 8, 11] 
         - name: ReshapeTokensToImage 
         - name: LearnedInterpolateToPyramidal
-      decoder: UNetDecoder
+      decoder: UperNetDecoder
       #TODO user provided channels
-      decoder_channels: [512, 256, 128, 64]
-      head_channel_list:
-        - 256
+      decoder_channels: 64
+      # head_channel_list:
+        # - 256
 
       head_dropout: 0.1
     

@@ -17,6 +17,7 @@ class UNetDecoder(nn.Module):
         embed_dim: list[int],
         channels: list[int],
         use_batchnorm: bool | str | dict[str, Any] = "batchnorm",
+        add_center_block: bool,
         attention_type: str | None = None,
     ):
         """Constructor

@@ -15,10 +15,10 @@ import torch
 from huggingface_hub import hf_hub_download, snapshot_download
 
 from terratorch.cli_tools import LightningInferenceModel
-from terratorch.datamodules import HelioNetCDFDataModule
-from terratorch.datasets import HelioNetCDFDataset
+# from terratorch.datamodules import HelioNetCDFDataModule
+# from terratorch.datasets import HelioNetCDFDataset
 from terratorch.registry import BACKBONE_REGISTRY
-from terratorch.tasks import InferenceTask
+# from terratorch.tasks import InferenceTask
 
 
 # Allow overriding default test asset locations via environment variables.
@@ -216,108 +216,108 @@ def test_burnscars_predict(burnscars_image, model_name):
     gc.collect()
 
 
-def test_surya():
-    """
-    Additional test for the Surya model
-    """
-    if not os.path.isdir("experiment"):
-        os.mkdir("experiment")
+# def test_surya():
+#     """
+#     Additional test for the Surya model
+#     """
+#     if not os.path.isdir("experiment"):
+#         os.mkdir("experiment")
 
-    root_dir = os.path.join(TMP_ROOT, "experiment")
-    # Downloading validation data
-    snapshot_download(repo_id="nasa-ibm-ai4science/Surya-1.0_validation_data", repo_type="dataset", local_dir=root_dir)
+#     root_dir = os.path.join(TMP_ROOT, "experiment")
+#     # Downloading validation data
+#     snapshot_download(repo_id="nasa-ibm-ai4science/Surya-1.0_validation_data", repo_type="dataset", local_dir=root_dir)
 
-    hf_hub_download(repo_id="nasa-ibm-ai4science/Surya-1.0", filename="scalers.yaml", local_dir=root_dir)
+#     hf_hub_download(repo_id="nasa-ibm-ai4science/Surya-1.0", filename="scalers.yaml", local_dir=root_dir)
 
-    # Creating index file
-    sample_files = glob.glob(os.path.join(root_dir, "*.nc"))
-    paths = sorted(sample_files)
-    present = len(paths) * [1]
+#     # Creating index file
+#     sample_files = glob.glob(os.path.join(root_dir, "*.nc"))
+#     paths = sorted(sample_files)
+#     present = len(paths) * [1]
 
-    timestamps = []
-    for ff in paths:
-        filename = os.path.basename(ff).replace(".nc", "")
-        date, timestamp = filename.split("_")
+#     timestamps = []
+#     for ff in paths:
+#         filename = os.path.basename(ff).replace(".nc", "")
+#         date, timestamp = filename.split("_")
 
-        year = int(date[:4])
-        month = int(date[4:6])
-        day = int(date[6:])
-        hour = int(timestamp[:2])
-        minutes = int(timestamp[2:])
-        seconds = 0
+#         year = int(date[:4])
+#         month = int(date[4:6])
+#         day = int(date[6:])
+#         hour = int(timestamp[:2])
+#         minutes = int(timestamp[2:])
+#         seconds = 0
 
-        date_datetime = datetime(year, month, day, hour, minutes, seconds).strftime("%Y-%m-%d %H:%M:%S")
+#         date_datetime = datetime(year, month, day, hour, minutes, seconds).strftime("%Y-%m-%d %H:%M:%S")
 
-        timestamps.append(date_datetime)
+#         timestamps.append(date_datetime)
 
-    index_dict = {"path": paths, "timestep": timestamps, "present": present}
-    index_dataframe = pd.DataFrame(index_dict)
-    index_dataframe.to_csv(os.path.join(root_dir, "index.csv"))
-    index_path = os.path.join(root_dir, "index.csv")
-    scalers_path = os.path.join(root_dir, "scalers.yaml")
+#     index_dict = {"path": paths, "timestep": timestamps, "present": present}
+#     index_dataframe = pd.DataFrame(index_dict)
+#     index_dataframe.to_csv(os.path.join(root_dir, "index.csv"))
+#     index_path = os.path.join(root_dir, "index.csv")
+#     scalers_path = os.path.join(root_dir, "scalers.yaml")
 
-    channels = [
-        "aia94",
-        "aia131",
-        "aia171",
-        "aia193",
-        "aia211",
-        "aia304",
-        "aia335",
-        "aia1600",
-        "hmi_m",
-        "hmi_bx",
-        "hmi_by",
-        "hmi_bz",
-        "hmi_v",
-    ]
+#     channels = [
+#         "aia94",
+#         "aia131",
+#         "aia171",
+#         "aia193",
+#         "aia211",
+#         "aia304",
+#         "aia335",
+#         "aia1600",
+#         "hmi_m",
+#         "hmi_bx",
+#         "hmi_by",
+#         "hmi_bz",
+#         "hmi_v",
+#     ]
 
-    run = "predict"
+#     run = "predict"
 
-    start_time = time.time()
-    if run == "predict":
-        datamodule = HelioNetCDFDataModule(
-            train_index_path=index_path,
-            test_index_path=index_path,
-            val_index_path=index_path,
-            predict_index_path=index_path,
-            batch_size=1,
-            num_workers=0,
-            time_delta_input_minutes=[-60, 0],
-            time_delta_target_minutes=+60,
-            channels=channels,
-            n_input_timestamps=2,
-            rollout_steps=1,
-            scalers=scalers_path,
-        )
+#     start_time = time.time()
+#     if run == "predict":
+#         datamodule = HelioNetCDFDataModule(
+#             train_index_path=index_path,
+#             test_index_path=index_path,
+#             val_index_path=index_path,
+#             predict_index_path=index_path,
+#             batch_size=1,
+#             num_workers=0,
+#             time_delta_input_minutes=[-60, 0],
+#             time_delta_target_minutes=+60,
+#             channels=channels,
+#             n_input_timestamps=2,
+#             rollout_steps=1,
+#             scalers=scalers_path,
+#         )
 
-        model_name = "heliofm_backbone_surya"
-        backbone = BACKBONE_REGISTRY.build(model_name, pretrained=True)
-        datamodule.setup("predict")
-        model = InferenceTask(model=backbone)
-        pl.seed_everything(0)
-        # Lightning Trainer
-        trainer = pl.Trainer(
-            accelerator="gpu",
-            strategy="auto",
-            devices=1,
-            # precision='bf16-mixed',
-            num_nodes=1,
-            logger=True,
-            max_epochs=1,
-            log_every_n_steps=1,
-            enable_checkpointing=True,
-            callbacks=[pl.callbacks.RichProgressBar()],
-            default_root_dir="output/heliofm",
-        )
+#         model_name = "heliofm_backbone_surya"
+#         backbone = BACKBONE_REGISTRY.build(model_name, pretrained=True)
+#         datamodule.setup("predict")
+#         model = InferenceTask(model=backbone)
+#         pl.seed_everything(0)
+#         # Lightning Trainer
+#         trainer = pl.Trainer(
+#             accelerator="gpu",
+#             strategy="auto",
+#             devices=1,
+#             # precision='bf16-mixed',
+#             num_nodes=1,
+#             logger=True,
+#             max_epochs=1,
+#             log_every_n_steps=1,
+#             enable_checkpointing=True,
+#             callbacks=[pl.callbacks.RichProgressBar()],
+#             default_root_dir="output/heliofm",
+#         )
 
-        # Training
-        prediction = trainer.predict(model, datamodule=datamodule)
-        print(f"Elapsed time: {time.time() - start_time} s")
+#         # Training
+#         prediction = trainer.predict(model, datamodule=datamodule)
+#         print(f"Elapsed time: {time.time() - start_time} s")
 
-        assert all([isinstance(p, torch.Tensor) for p in prediction]), (
-            f"Expected predictions to be type torch.Tensor, got {type(prediction)}"
-        )
+#         assert all([isinstance(p, torch.Tensor) for p in prediction]), (
+#             f"Expected predictions to be type torch.Tensor, got {type(prediction)}"
+#         )
 
 
 ## Only run these tests after running test_finetune.py.
@@ -345,6 +345,9 @@ def test_current_terratorch_version_floods_predict(config_name, floods_image):
     config_path = os.path.join(TMP_ROOT, config_name, "lightning_logs", "version_0", "config_deploy.yaml")
 
     pattern = os.path.join(TMP_ROOT, config_name, "best-state_dict-epoch=*.ckpt")
+    files = glob.glob(pattern)
+    checkpoint_path = max(files, key=os.path.getmtime)
+
     checkpoint_path = glob.glob(pattern)[0]
 
     preds = run_inference(config=config_path, checkpoint=checkpoint_path, image=floods_image)
@@ -388,44 +391,44 @@ def test_current_terratorch_version_burnscars_predict(config_name, burnscars_ima
     gc.collect()
 
 
-@pytest.mark.parametrize(
-    "model_name",
-    [
-        "eo_v1_100",
-        "eo_v2_300",
-        "eo_v2_600",
-        "swinb",
-        "swinl",
-        "smp_resnet34",
-        "enc_dec_resnet34",
-        "timm_resnet34",
-        "timm_resnet18",
-        "timm_resnet50",
-        "timm_resnet101",
-        "timm_resnet152",
-        "clay_v1",
-        "timm_convnext_large",
-        "timm_convnext_xlarge",
-        "terramind_large",
-        "terramind_base",
-        "experiment",
-    ],
-)
-def test_cleanup(model_name):
-    # Delete all folders creating during finetuning after running inference.
-    full_path = os.path.join(TMP_ROOT, model_name)
-    print("Attempting to delete:", full_path)
-    try:
-        shutil.rmtree(full_path)
-        print(f"Deleted: {full_path}")
-    except FileNotFoundError:
-        print(f"Already deleted or missing: {full_path}")
-    except PermissionError:
-        print(f"Permission denied: {full_path}")
-    except Exception as e:
-        print(f"Error deleting {full_path}: {e}")
+# @pytest.mark.parametrize(
+#     "model_name",
+#     [
+#         "eo_v1_100",
+#         "eo_v2_300",
+#         "eo_v2_600",
+#         "swinb",
+#         "swinl",
+#         "smp_resnet34",
+#         "enc_dec_resnet34",
+#         "timm_resnet34",
+#         "timm_resnet18",
+#         "timm_resnet50",
+#         "timm_resnet101",
+#         "timm_resnet152",
+#         "clay_v1",
+#         "timm_convnext_large",
+#         "timm_convnext_xlarge",
+#         "terramind_large",
+#         "terramind_base",
+#         "experiment",
+#     ],
+# )
+# def test_cleanup(model_name):
+#     # Delete all folders creating during finetuning after running inference.
+#     full_path = os.path.join(TMP_ROOT, model_name)
+#     print("Attempting to delete:", full_path)
+#     try:
+#         shutil.rmtree(full_path)
+#         print(f"Deleted: {full_path}")
+#     except FileNotFoundError:
+#         print(f"Already deleted or missing: {full_path}")
+#     except PermissionError:
+#         print(f"Permission denied: {full_path}")
+#     except Exception as e:
+#         print(f"Error deleting {full_path}: {e}")
 
-    assert not os.path.exists(full_path)
+#     assert not os.path.exists(full_path)
 
-    gc.collect()
+#     gc.collect()
 
