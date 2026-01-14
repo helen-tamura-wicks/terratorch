@@ -26,7 +26,7 @@ all_tests=$(cd "$TEST_DIR" && \
   pytest --collect-only -q integrationtests/test_base_set.py 2>/dev/null | \
   grep -E '^integrationtests/test_base_set\.py::' || true)
   
-echo "Found tests: ${#all_tests[@]} "
+echo "Found tests: ${#all_tests[@]}"
 
 
 
