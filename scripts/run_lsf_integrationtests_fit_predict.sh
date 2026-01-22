@@ -79,7 +79,6 @@ submit_test_job() {
 
 run_tests_for_type() {
     local test_list=("$@")  # all arguments passed as an array
-    echo "Test list : $test_list"
     for test in "${test_list[@]}"; do
         submit_test_job "$test"
         echo "Submiited job for $test"
