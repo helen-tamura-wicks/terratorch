@@ -21,7 +21,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 from torchgeo.datamodules import NonGeoDataModule
 
-from terratorch.datamodules.utils import wrap_in_compose_is_list
+from terratorch.datamodules.utils import Normalize, wrap_in_compose_is_list
 from terratorch.datasets import GenericNonGeoPixelwiseRegressionDataset, GenericNonGeoSegmentationDataset, HLSBands
 from terratorch.io.file import load_from_file_or_attribute
 
@@ -41,32 +41,6 @@ logger = logging.getLogger("terratorch")
 #     if len(batch["image"]) != len(batch["metadata"]):
 #         print(len(batch["image"]), len(batch["metadata"]))
 #     return batch
-
-
-class Normalize(Callable):
-    def __init__(self, means, stds):
-        super().__init__()
-        self.means = means
-        self.stds = stds
-
-    def __call__(self, batch, denormalize=False):
-        image = batch["image"]
-        if len(image.shape) == 5:
-            # B, C, T, H, W
-            means = torch.tensor(self.means, device=image.device).view(1, -1, 1, 1, 1)
-            stds = torch.tensor(self.stds, device=image.device).view(1, -1, 1, 1, 1)
-        elif len(image.shape) == 4:
-            # B, C, H, W
-            means = torch.tensor(self.means, device=image.device).view(1, -1, 1, 1)
-            stds = torch.tensor(self.stds, device=image.device).view(1, -1, 1, 1)
-        else:
-            msg = f"Expected batch to have 5 or 4 dimensions, but got {len(image.shape)}"
-            raise Exception(msg)
-        if denormalize:
-            batch["image"] = image * stds + means
-        else:
-            batch["image"] = (image - means) / stds
-        return batch
 
 
 class GenericNonGeoSegmentationDataModule(NonGeoDataModule):
