@@ -49,7 +49,7 @@ jobs:
         run: |
           pip install pip==25.1
           pip --version
-          pip install -e .[test, prithviwxc, granitewxc]
+          pip install -e .[test,prithviwxc,granitewxc]
       - name: List pip dependencies
         run: pip list
       - name: Test with pytest
