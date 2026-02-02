@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import re
+import warnings
 import torch
 import rasterio
 import pandas as pd
