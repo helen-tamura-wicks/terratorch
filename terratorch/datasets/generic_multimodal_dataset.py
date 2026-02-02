@@ -4,10 +4,10 @@
 
 import glob
 import logging
-import os
 import random
-import re
 import warnings
+import os
+import re
 import torch
 import rasterio
 import pandas as pd
@@ -17,9 +17,7 @@ from typing import Any
 
 import albumentations as A
 import numpy as np
-import pandas as pd
 import rioxarray
-import torch
 import xarray as xr
 from einops import rearrange
 from matplotlib import pyplot as plt
@@ -163,9 +161,9 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
             f"concat_bands can only be used with image modalities, "
             f"but non-image modalities are given: {self.non_image_modalities}"
         )
-        assert not self.concat_bands or not allow_missing_modalities, (
-            "concat_bands cannot be used with allow_missing_modalities."
-        )
+        assert (
+            not self.concat_bands or not allow_missing_modalities
+        ), "concat_bands cannot be used with allow_missing_modalities."
 
         if self.expand_temporal_dimension:
             if not self.temporal_channel_major:
@@ -213,9 +211,10 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
                 return stem
 
             if allow_missing_modalities:
-                valid_files = list(
-                    set([get_file_id(file, mod) for mod, files in image_files.items() for file in files])
-                )
+                valid_files = list(set([get_file_id(file, mod)
+                                        for mod, files in image_files.items()
+                                        for file in files
+                                        ]))
             else:
                 valid_files = [get_file_id(file, self.modalities[0]) for file in image_files[self.modalities[0]]]
 
@@ -224,14 +223,12 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
         if len(valid_files) == 0:
             # Provide additional information if no candidates are found
             image_files = {m: f[:3] for m, f in image_files.items()}
-            raise ValueError(
-                f"No sample candidates (file prefixes) found for multimodal dataset. "
-                f"Please review files and parameters.\n"
-                f"data_root: {data_root}\n"
-                f"image_grep: {image_grep}\n"
-                f"allow_missing_modalities: {allow_missing_modalities}\n"
-                f"File examples in data_root: {image_files}\n"
-            )
+            raise ValueError(f"No sample candidates (file prefixes) found for multimodal dataset. "
+                             f"Please review files and parameters.\n"
+                             f"data_root: {data_root}\n"
+                             f"image_grep: {image_grep}\n"
+                             f"allow_missing_modalities: {allow_missing_modalities}\n"
+                             f"File examples in data_root: {image_files}\n")
 
         # Check for parquet and csv files with modality data and read the file
         for m, m_path in data_root.items():
@@ -239,19 +236,15 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
                 data_root[m] = load_table_data(m_path)
                 # Check for some sample keys
                 if not any(f in data_root[m].index for f in valid_files[:100]):
-                    warnings.warn(
-                        f"Sample key expected in table index (first column) for {m} (file: {m_path}). "
-                        f"{valid_files[:3] + ['...']} are not in index {list(data_root[m].index[:3]) + ['...']}."
-                    )
+                    warnings.warn(f"Sample key expected in table index (first column) for {m} (file: {m_path}). "
+                                  f"{valid_files[:3]+['...']} are not in index {list(data_root[m].index[:3])+['...']}.")
         if label_data_root is not None:
             if os.path.isfile(label_data_root):
                 label_data_root = load_table_data(label_data_root)
                 # Check for some sample keys
                 if not any(f in label_data_root.index for f in valid_files[:100]):
-                    warnings.warn(
-                        f"Keys expected in table index (first column) for labels (file: {label_data_root}). "
-                        f"The keys {valid_files[:3] + ['...']} are not in the index."
-                    )
+                    warnings.warn(f"Keys expected in table index (first column) for labels (file: {label_data_root}). "
+                                  f"The keys {valid_files[:3] + ['...']} are not in the index.")
 
         # Iterate over all files in split
         failed_candidates = []
@@ -277,11 +270,9 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
                     if m_files:
                         sample[m] = m_files[-1]
                         if len(m_files) > 1:
-                            warnings.warn(
-                                f"Found multiple matching files for sample {file} and grep {image_grep[m]}: "
-                                f"{m_files}. Selecting last one. "
-                                f"Consider changing data structure or parameters for unique selection."
-                            )
+                            warnings.warn(f"Found multiple matching files for sample {file} and grep {image_grep[m]}: "
+                                          f"{m_files}. Selecting last one. "
+                                          f"Consider changing data structure or parameters for unique selection.")
                 else:
                     # Exact match
                     file_path = os.path.join(m_path, file + image_grep[m].strip('*'))
@@ -338,7 +329,7 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
             for modality in self.modalities:
                 if modality in self.output_bands and modality not in self.dataset_bands:
                     msg = f"If output bands are provided, dataset_bands must also be provided (modality: {modality})"
-                    raise Exception(msg)
+                    raise Exception(msg)  # noqa: PLE0101
         else:
             self.output_bands = {}
 
