@@ -1,3 +1,13 @@
 {
-  "settingsInheritedFrom": "ibm-mend-config/mend-config@main"
+  "scanSettings": {
+    "configMode": "LOCAL",
+    "baseScan": true
+  },
+  "checkRunSettings": {
+    "displayLimit": 50,
+    "vulnerableCheckRunConclusion": "failure"
+  },
+  "issueSettings": {
+    "minSeverityLevel": "HIGH"
+  }
 }
