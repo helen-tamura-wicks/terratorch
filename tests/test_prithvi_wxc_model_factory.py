@@ -2,25 +2,35 @@
 
 import os
 import sys
-
 import pytest
 import torch
 import torch.distributed as dist
-import yaml
-from granitewxc.utils.config import get_config
-from huggingface_hub import hf_hub_download
+import lightning.pytorch as pl
 from lightning.pytorch import Trainer
+from typing import Any
 
+# Check for dependencies
+try:
+    import prithviwxc
+    import granitewxc
+    from granitewxc.utils.config import get_config
+    from granitewxc.utils.data import _get_transforms
+    HAS_WXC_DEPS = True
+except ImportError:
+    HAS_WXC_DEPS = False
+
+# Only import internal terratorch modules if deps are present 
+# or wrap them in the same check if they depend on wxc packages
 from terratorch.models.wxc_model_factory import WxCModelFactory
 from terratorch.tasks.wxc_task import WxCTask
-import lightning.pytorch as pl
-
 from terratorch.datamodules.era5 import ERA5DataModule
-from terratorch.tasks.wxc_task import WxCTask
-from typing import Any
 from terratorch.datamodules.merra2_downscale import Merra2DownscaleNonGeoDataModule
-from granitewxc.utils.data import _get_transforms
 
+
+pytestmark = pytest.mark.skipif(
+    not HAS_WXC_DEPS, 
+    reason="PrithviWxC or GraniteWxC packages are not installed"
+)
 
 def setup_function():
     print("\nSetup function is called")
