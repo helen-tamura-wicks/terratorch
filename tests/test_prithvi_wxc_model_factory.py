@@ -15,16 +15,17 @@ try:
     import granitewxc
     from granitewxc.utils.config import get_config
     from granitewxc.utils.data import _get_transforms
+    # Only import internal terratorch modules if deps are present 
+    # or wrap them in the same check if they depend on wxc packages
+    from terratorch.models.wxc_model_factory import WxCModelFactory
+    from terratorch.tasks.wxc_task import WxCTask
+    from terratorch.datamodules.era5 import ERA5DataModule
+    from terratorch.datamodules.merra2_downscale import Merra2DownscaleNonGeoDataModule
+
     HAS_WXC_DEPS = True
 except ImportError:
     HAS_WXC_DEPS = False
 
-# Only import internal terratorch modules if deps are present 
-# or wrap them in the same check if they depend on wxc packages
-from terratorch.models.wxc_model_factory import WxCModelFactory
-from terratorch.tasks.wxc_task import WxCTask
-from terratorch.datamodules.era5 import ERA5DataModule
-from terratorch.datamodules.merra2_downscale import Merra2DownscaleNonGeoDataModule
 
 
 pytestmark = pytest.mark.skipif(
