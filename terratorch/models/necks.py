@@ -211,7 +211,7 @@ class MaxpoolToPyramidal(Neck):
 @TERRATORCH_NECK_REGISTRY.register
 class ReshapeTokensToImage(Neck):
     def __init__(
-        self, channel_list: list[int], remove_cls_token=True, effective_time_dim: int = 1, h: int | None = None
+        self, channel_list: list[int], remove_cls_token=True, effective_time_dim: int = 1, h: int | None = None, temporal_inputs: bool = False,
     ):
         """Reshape output of transformer encoder so it can be passed to a conv net.
 
@@ -232,15 +232,21 @@ class ReshapeTokensToImage(Neck):
             h (int | None):
                 You can choose a value for the height of the reshaped image.
                 The embedding size will be implicitly discovered from it.
+            temporal_inputs (bool, optional): Used for embedding generation workflows, flag to handle temporal data correctly.
         """
         super().__init__(channel_list)
         self.remove_cls_token = remove_cls_token
         self.effective_time_dim = effective_time_dim
         self.h = h
+        self.temporal_inputs = temporal_inputs
 
     def forward(self, features: list[torch.Tensor], image_size=None, **kwargs) -> list[torch.Tensor]:
         out = []
         for x in features:
+            if self.temporal_inputs:
+                # used for inputs with a separate time dim, effective_time_dim is used for inputs concatenated along channel dim
+                timesteps = x.shape[1] # shape is (B, T, ...), flatten time dim into B
+                x = rearrange(x, "b t ... -> (b t) ...")
             if x.dim() >= 4:
                 out.append(x)
                 continue
@@ -279,6 +285,10 @@ class ReshapeTokensToImage(Neck):
                     t=self.effective_time_dim,
                     h=h,
                 )
+
+                if self.temporal_inputs:
+                    # unflatten back to (B, T, C, H, W)
+                    encoded = rearrange(encoded, "(b t) c h w -> b t c h w", t=timesteps)
 
                 out.append(encoded)
         return out
