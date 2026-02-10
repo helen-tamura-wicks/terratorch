@@ -90,6 +90,7 @@ class GenericNonGeoSegmentationDataModule(NonGeoDataModule):
         pin_memory: bool = False,
         check_stackability: bool = True,
         tortilla_file: Path | None = None,
+        return_georeference: bool = False,
         **kwargs: Any,
     ) -> None:
         """Constructor
@@ -157,6 +158,7 @@ class GenericNonGeoSegmentationDataModule(NonGeoDataModule):
             into device/CUDA pinned memory before returning them. Defaults to False.
             check_stackability (bool): Check if all the files in the dataset has the same size and can be stacked.
             tortilla_file (Path | None): Path to a tortilla file. If provided, the dataset will be loaded from the tortilla file. Defaults to None.
+            return_georeference (bool): Whether to return georeference metadata info (CRS, Bounds, ...). Defaults to False.
 
         """
         super().__init__(GenericNonGeoSegmentationDataset, batch_size, num_workers, **kwargs)
@@ -191,6 +193,7 @@ class GenericNonGeoSegmentationDataModule(NonGeoDataModule):
         self.pca_step = pca_step
         self.expand_temporal_dimension = expand_temporal_dimension
         self.reduce_zero_label = reduce_zero_label
+        self.return_georeference = return_georeference
 
         self.train_transform = wrap_in_compose_is_list(train_transform)
         self.val_transform = wrap_in_compose_is_list(val_transform)
@@ -260,6 +263,7 @@ class GenericNonGeoSegmentationDataModule(NonGeoDataModule):
                 reduce_zero_label=self.reduce_zero_label,
                 tortilla_df=self.tortilla_df,
                 tortilla_indices=self._get_tortilla_indices(stage),
+                return_georeference = self.return_georeference
             )
         if stage in ["fit", "validate"]:
             self.val_dataset = self.dataset_class(
@@ -284,6 +288,7 @@ class GenericNonGeoSegmentationDataModule(NonGeoDataModule):
                 reduce_zero_label=self.reduce_zero_label,
                 tortilla_df=self.tortilla_df,
                 tortilla_indices=self._get_tortilla_indices(stage),
+                return_georeference=self.return_georeference
             )
         if stage in ["test"]:
             self.test_dataset = self.dataset_class(
@@ -308,6 +313,7 @@ class GenericNonGeoSegmentationDataModule(NonGeoDataModule):
                 reduce_zero_label=self.reduce_zero_label,
                 tortilla_df=self.tortilla_df,
                 tortilla_indices=self._get_tortilla_indices(stage),
+                return_georeference=self.return_georeference
             )
         if stage in ["predict"] and self.predict_root:
             self.predict_dataset = self.dataset_class(
@@ -326,6 +332,7 @@ class GenericNonGeoSegmentationDataModule(NonGeoDataModule):
                 pca_step=self.pca_step,
                 expand_temporal_dimension=self.expand_temporal_dimension,
                 reduce_zero_label=self.reduce_zero_label,
+                return_georeference=self.return_georeference
             )
 
     def _dataloader_factory(self, split: str) -> DataLoader[dict[str, Tensor]]:
