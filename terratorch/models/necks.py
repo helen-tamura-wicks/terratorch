@@ -101,7 +101,7 @@ class AggregateTokens(Neck):
         for i, index in enumerate(self.indices):
             feat = features[index] if len(features) > 1 else features[0]
 
-            if feat.dim() == 3:
+            if feat.dim() == 4:
                 # Assuming spatial grid, flattening spatial dimension
                 B  = feat.shape[0]
                 feat = feat.reshape(B, -1, self.latent_dim[i])
