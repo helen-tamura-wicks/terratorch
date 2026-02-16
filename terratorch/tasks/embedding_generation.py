@@ -114,14 +114,17 @@ class EmbeddingGenerationTask(TerraTorchTask):
                         "Please set an embedding pooling mode (e.g., mean, max, or cls) or choose a different output format."
                     )
             elif embedding_pooling in ["mean", "max", "min", "cls"]:
-                model_args["necks"] = [
-                    {
+                model_args["necks"] = []
+                neck_cfg = {
                         "name": "AggregateTokens",
                         "pooling": embedding_pooling,
                         "indices": self.embedding_indices,
                         "drop_cls": has_cls
                     }
-                ]
+                if model_args.get("backbone_use_temporal", False):
+                    neck_cfg["temporal_inputs"] = True
+                model_args["necks"].append(neck_cfg)
+
                 if self.output_format == "tiff":
                     warnings.warn("GeoTIFF output not recommended with embedding pooling, saves 1D vectors as (C,1,1).")
             else:
