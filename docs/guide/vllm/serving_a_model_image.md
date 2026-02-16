@@ -1,15 +1,19 @@
-# Initializing and serving a model with vLLM
+# Initializing and serving a model with vLLM in image-to-image mode
 
 This section shows an example of how to bootstrap a TerraTorch model on vLLM and
-perform a sample inference. This section assumes that you have prepared your
-model for serving with vLLM and you have identified the IOProcessor to be used.
+perform an image-to-image inference, from a GeoTiff input to a GeoTiff output,
+using an IOProcessor plugin. This section assumes that you have
+[prepared your model for serving with vLLM](./prepare_your_model.md) and you
+have identified the
+[IOProcessor to be used](./vllm_io_plugins.md#available-terratorch-ioprocessor-plugins).
 
-The examples in the rest of this document will use the
+The example in the rest of this document uses the
 [Prithvi-EO-2.0-300M-TL](https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL-Sen1Floods11)
 model finetuned to segment the extent of floods on Sentinel-2 images from the
-Sen1Floods11 dataset and the `terratorch_segmentation` IOProcessor plugin.
-However, the commands can be adapted to work with any other supported models and
-plugins.
+Sen1Floods11 dataset and the
+[`terratorch_segmentation`](./plugins/segmentation_io_plugin.md) IOProcessor
+plugin. However, the commands can be adapted to work with any other supported
+models and plugins.
 
 ## Starting the vLLM serving instance
 
@@ -45,26 +49,12 @@ instance
 
 ## Send An Inference Request To The Model
 
-TerraTorch models can be served in vLLM via the `/pooling` endpoint with the
-below payload
-
-```python title="vLLM pooling request payload"
-
-request_payload = {
-    "data": Any,
-    "model": "model_name",
-    "softmax": False
-}
-```
-
-The `data` field accepts any format and its schema is defined by the IOProcessor
-plugin used. The `softmax=True` is mandatory as it is required for the plugins
-to receive the raw model output. The `model` field must contain the same model
-name used for starting the server.
-
-In this example, the format of the `data` field is defined by the
-`terratorch_segmentation` plugin, and for this example we will use the below
-request_payload:
+TerraTorch models can be served in vLLM via the `/pooling` endpoint. The snippet
+below shows an example payload that can be used to send an inference request to
+the model when using the `terratorch_segmentation` IOProcessor plugin. Refer to
+the documentation of the
+[available IOProcessors](./vllm_io_plugins.md#available-terratorch-ioprocessor-plugins)
+for more information on the expected payload format.
 
 ```python title="Request payload for the terratorch_segmentation plugin"
 request_payload = {
@@ -79,14 +69,18 @@ request_payload = {
 }
 ```
 
+The user can save this payload in a file named `payload.json`.
+
 With this payload the IOProcessor plugin will download the input geoTiff from a
 URL and return the path on local filesystem of the output geoTiff.
 
 Assuming the vLLM server is listening on `localhost:8000` the below snippet
 shows how to send the inference request and retrieve the output file path.
 
-```python title="Request inference to the vLLM serving instance"
-ret = requests.post("http://localhost:8000/pooling", json=request_payload)
-response = ret.json()
-out_file_path = response["data"]["data"]
+```bash title="Request inference to the vLLM serving instance"
+curl -s -H "Content-Type: application/json" \
+--data @payload.json \
+http://localhost:8000/pooling \
+| jq -r '.data.data'
+
 ```

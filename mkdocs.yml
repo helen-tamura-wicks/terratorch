@@ -108,7 +108,8 @@ nav:
         - Available Plugins:
           - Segmentation: guide/vllm/plugins/segmentation_io_plugin.md
       - Prepare your model for serving with vLLM: guide/vllm/prepare_your_model.md
-      - Initializing and serving a model with vLLM: guide/vllm/serving_a_model.md
+      - Initializing and serving a model with vLLM in tenosr-to-tensor mode: guide/vllm/serving_a_model_tensor.md
+      - Initializing and serving a model with vLLM in image-to-image mode: guide/vllm/serving_a_model_image.md
     - FAQs: guide/faqs.md
 
   - Tutorials:
