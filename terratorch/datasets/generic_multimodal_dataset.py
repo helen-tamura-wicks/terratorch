@@ -152,7 +152,7 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
         # Default behaviour (no subdirs)
         self.subdir_data = False
         self.part_dirs = None
-        self.prefix = prefix
+        self.prefix = prefix if prefix is not None else "*"
 
         self.constant_scale = constant_scale or {}
         self.no_data_replace = no_data_replace
@@ -202,6 +202,30 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
             if len(valid_files) == 0:
                 raise ValueError(f"No sample candidates (file prefixes) found in split file {self.split_file}.")
 
+            # Prepend prefix to all filenames, and warn if wildcards remain in it
+            prefix = getattr(self, "prefix", "*")
+            if prefix != "*":
+                # Strip trailing wildcards
+                if prefix.endswith("**"):
+                    prefix = prefix[:-2]
+                elif prefix.endswith("*"):
+                    prefix = prefix[:-1]
+
+                # Warn if remaining prefix still contains a wildcard pattern
+                if ("**" in prefix) or ("*" in prefix):
+                    warnings.warn(
+                        f"Prefix={prefix!r} contains a wildcard pattern. Prepending it to split-file entries may result in a heavy glob search later. "
+                        f"If the split file entries already contain the prefix, do not pass the `prefix` argument. Otherwise, provide a non-glob prefix "
+                        f"(e.g. 'part-000013/', 'files_') or consider adding prefix into split file entries.",
+                        stacklevel=2,
+                    )
+
+                # Prepend prefix, make sure v is not an absolute path
+                valid_files = [
+                    (os.path.join(prefix, v.lstrip("/\\")) if v and not os.path.isabs(v) else v)
+                    for v in valid_files
+                ]
+
         else:
             image_files = {}
             for m, m_paths in data_root.items():
@@ -211,8 +235,6 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
 
             def get_file_id(file_name, mod):
                 base = os.path.basename(file_name)
-                parent = os.path.basename(os.path.dirname(file_name))
-
                 glob_as_regex = '^(.*?)' + ''.join(re.escape(ch) for ch in image_grep[mod].strip('*')) + '$'
                 stem = re.match(glob_as_regex, base).group(1)
 
@@ -220,6 +242,15 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
                     stem = os.path.splitext(stem)[0]
 
                 if "/" in self.prefix:
+                    parent = os.path.basename(os.path.dirname(file_name)) # direct parent dir
+
+                    # warn if we have more than one subdirectory level
+                    if self.prefix.count("/") > 1:
+                        warnings.warn(
+                            f"Multiple subdirectories in {self.prefix!r}; only a single parent directory "
+                            f"is supported. Using parent={parent!r}.",
+                            stacklevel=2,
+                        )
                     return f"{parent}/{stem}"
 
                 return stem
