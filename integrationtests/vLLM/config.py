@@ -9,8 +9,8 @@ models = {
     },
     "terramind_base_flood": {
         "location": "ibm-esa-geospatial/TerraMind-base-Flood",
-        "io_processor_plugin": "terratorch_tm_segmentation"
-    }
+        "io_processor_plugin": "terratorch_tm_segmentation",
+    },
 }
 
 inputs = {
@@ -48,5 +48,5 @@ inputs = {
         },
         "data_format": "url",
         "out_data_format": "path",
-    }
+    },
 }
