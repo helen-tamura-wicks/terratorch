@@ -9,7 +9,7 @@ trainer:
   logger:
     - class_path: lightning.pytorch.loggers.TensorBoardLogger
       init_args:
-        save_dir: /tmp/
+        save_dir: /dccstor/terratorch/tmp/terramind_large/
   callbacks:
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
