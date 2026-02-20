@@ -1,0 +1,21 @@
+name: Auto Approve Docs
+on: pull_request
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check if only docs are changed
+        id: docs_only
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          DIFF=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -v '\.md$' | wc -l)
+          echo "non_md_count=$DIFF" >> $GITHUB_OUTPUT
+
+      - name: Approve PR
+        if: steps.docs_only.outputs.non_md_count == '0'
+        uses: hmarr/auto-approve-action@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
