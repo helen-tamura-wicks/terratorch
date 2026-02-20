@@ -108,6 +108,37 @@ terratorch fit --config my_config.yaml --custom_modules_path ./custom_modules
 
 When provided, TerraTorch will add the specified directory (`./custom_modules` in this case) to Python's `sys.path`, making the modules within it importable.
 
+### How `backbone: HelloGeoModule` is resolved at runtime
+
+Given a config like:
+
+```yaml
+init_args:
+  model_factory: EncoderDecoderFactory
+  model_args:
+    backbone: HelloGeoModule
+```
+
+the runtime flow is:
+
+1. TerraTorch reads `custom_modules_path` and imports that package early in CLI startup.
+2. Importing your package executes decorators such as `@TERRATORCH_BACKBONE_REGISTRY.register`.
+3. `EncoderDecoderFactory` calls `_get_backbone(...)`, which calls `BACKBONE_REGISTRY.build("HelloGeoModule", ...)`.
+4. The registry instantiates the class registered under the name `HelloGeoModule`.
+
+So the class name is not resolved by Python reflection from YAML directly; it is resolved by TerraTorch's registry.
+
+Important implication: your package import must execute the file that contains the decorator.
+In practice, ensure your `custom_modules/__init__.py` imports the module that defines `HelloGeoModule`.
+
+```python
+# custom_modules/__init__.py
+from custom_modules.hello_geo_module import HelloGeoModule
+```
+
+If that import is missing, registration never runs and you will see an error like:
+`The model HelloGeoModule could not be instantiated from any source.`
+
 ## Step 3: Use Your Custom Component in the Configuration
 
 Now that TerraTorch can find and import your custom code, you can reference your custom classes in the YAML configuration.
