@@ -205,14 +205,8 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
             # Prepend prefix to all filenames, and warn if wildcards remain in it
             prefix = getattr(self, "prefix", "*")
             if prefix != "*":
-                # Strip trailing wildcards
-                if prefix.endswith("**"):
-                    prefix = prefix[:-2]
-                elif prefix.endswith("*"):
-                    prefix = prefix[:-1]
-
-                # Warn if remaining prefix still contains a wildcard pattern
-                if ("**" in prefix) or ("*" in prefix):
+                # Warn if prefix contains a wildcard pattern
+                if "*" in prefix:
                     warnings.warn(
                         f"Prefix={prefix!r} contains a wildcard pattern. Prepending it to split-file entries may result in a heavy glob search later. "
                         f"If the split file entries already contain the prefix, do not pass the `prefix` argument. Otherwise, provide a non-glob prefix "
