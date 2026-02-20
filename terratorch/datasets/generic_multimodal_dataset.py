@@ -229,7 +229,7 @@ class GenericMultimodalDataset(NonGeoDataset, ABC):
         else:
             image_files = {}
             for m, m_paths in data_root.items():
-                image_files[m] = sorted(glob.glob(os.path.join(m_paths, self.prefix + '*' + image_grep[m])))
+                image_files[m] = sorted(glob.glob(os.path.join(m_paths, self.prefix + image_grep[m])))
                 if len(image_files[m]) > 10_000:
                     warnings.warn("Found large data folder, consider providing split files to speed up dataset build.")
 
