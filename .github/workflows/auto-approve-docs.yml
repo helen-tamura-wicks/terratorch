@@ -1,6 +1,10 @@
 name: Auto Approve Docs
 on: pull_request
 
+permissions:
+  pull-requests: write
+  contents: read
+  
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
