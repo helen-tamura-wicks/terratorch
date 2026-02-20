@@ -22,6 +22,16 @@ my_project_root/
 └── ... (other project files)
 ```
 
+This is important!
+
+```python
+#custom_modules/__init__.py
+from custom_modules.my_custom_model import MySimpleCNN
+
+__all__ = ["MySimpleCNN"]
+
+```
+
 Inside `custom_modules/my_custom_model.py`, define your custom class or function. If you intend for TerraTorch's factories to discover this module (e.g., to use it as a backbone or decoder selected by name), you **must** register it using the appropriate registry decorator.
 
 For instance, to register a simple custom CNN as a backbone:
