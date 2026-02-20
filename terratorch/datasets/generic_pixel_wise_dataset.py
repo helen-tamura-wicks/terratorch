@@ -25,8 +25,9 @@ from torchgeo.datasets import NonGeoDataset
 import warnings
 from rasterio.errors import NotGeoreferencedWarning
 
-from terratorch.datasets.utils import HLSBands, default_transform, filter_valid_files, generate_bands_intervals
-from terratorch.datasets.utils import to_rgb, to_pca_rgb, resize_hwc
+from terratorch.datasets.utils import (HLSBands, default_transform, filter_valid_files,
+                                       generate_bands_intervals, to_rgb, to_pca_rgb,
+                                       resize_hwc, extract_georeference)
 
 class GenericPixelWiseDataset(NonGeoDataset, ABC):
     """
@@ -57,6 +58,7 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
         reduce_zero_label: bool = False,
         tortilla_df: pd.DataFrame | None = None,
         tortilla_indices: list[Hashable] | None = None,
+        return_georeference: bool = False,
     ) -> None:
         """Constructor
 
@@ -99,6 +101,7 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
                 expected 0. Defaults to False.
             tortilla_df (tortilla.DataFrame | None): Tortilla DataFrame to use for loading data. Defaults to None. If provided, data_root is ignored.
             tortilla_indices (list[Hashable] | None): List of indices to use from tortilla_df. Defaults to None, which uses all indices.
+            return_georeference (bool): Whether to return georeference metadata info (CRS, Bounds, ...). Defaults to False.
         """
         super().__init__()
 
@@ -112,6 +115,7 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
         self.reduce_zero_label = reduce_zero_label
         self.expand_temporal_dimension = expand_temporal_dimension
         self.temporal_channel_major = temporal_channel_major
+        self.return_georeference = return_georeference
 
         if self.expand_temporal_dimension:
             if not self.temporal_channel_major:
@@ -213,7 +217,8 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
         return len(self.image_files)
 
     def __getitem__(self, index: int) -> dict[str, Any]:
-        image = self._load_file(self.image_files[index], nan_replace=self.no_data_replace).to_numpy()
+        image, georef = (self._load_file(self.image_files[index], nan_replace=self.no_data_replace))
+        image = image.to_numpy()
         # to channels last
         if self.expand_temporal_dimension:
             if self.temporal_channel_major:
@@ -226,8 +231,10 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
         output = {
             "image": image.astype(np.float32) * self.constant_scale,
         }
+        if georef:
+            output['metadata'] = georef
         if self.segmentation_mask_files:
-            mask = self._load_file(self.segmentation_mask_files[index], nan_replace=self.no_label_replace)
+            mask, _ = self._load_file(self.segmentation_mask_files[index], nan_replace=self.no_label_replace)
             output["mask"] = mask.to_numpy()[0]
             if self.reduce_zero_label:
                 output["mask"] -= 1
@@ -237,12 +244,15 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
 
         return output
 
-    def _load_file(self, path, nan_replace: int | float | None = None) -> xr.DataArray:
-        #warnings.filterwarnings("ignore", category=NotGeoreferencedWarning) #TODO Handle NotGeoreferencedWarning better
+    def _load_file(self, path, nan_replace: int | float | None = None) -> tuple[xr.DataArray, dict | None]:
         data = rioxarray.open_rasterio(path, masked=True)
         if nan_replace is not None:
             data = data.fillna(nan_replace)
-        return data
+        if getattr(self, "return_georeference", False):
+            georef = extract_georeference(path)
+            return data, georef
+        else:
+            return data, None
 
     def plot(
             self,
@@ -351,6 +361,7 @@ class GenericNonGeoSegmentationDataset(GenericPixelWiseDataset):
         reduce_zero_label: bool = False,
         tortilla_df: pd.DataFrame | None = None,
         tortilla_indices: list[Hashable] | None = None,
+        return_georeference: bool = False,
     ) -> None:
         """See :class:`GenericPixelWiseDataset` for shared args.
 
@@ -380,6 +391,7 @@ class GenericNonGeoSegmentationDataset(GenericPixelWiseDataset):
             reduce_zero_label=reduce_zero_label,
             tortilla_df=tortilla_df,
             tortilla_indices=tortilla_indices,
+            return_georeference=return_georeference
         )
         self.num_classes = num_classes
         self.class_names = class_names
