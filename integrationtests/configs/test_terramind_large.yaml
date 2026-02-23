@@ -82,8 +82,8 @@ data:
       - 12
 
     modalities:
-      - S2L1C
       - S1GRD
+      - S2L1C
 
     rgb_modality: S2L1C
     rgb_indices: 
