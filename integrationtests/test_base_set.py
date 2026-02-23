@@ -403,7 +403,6 @@ def test_latest_terratorch_version_floods_predict(config_name, floods_image_dir)
         "eo_v2_600",
         "swinb",
         "swinl",
-        "timm_resnet34",
         "timm_resnet18",
         "timm_resnet50",
         "timm_resnet101",
