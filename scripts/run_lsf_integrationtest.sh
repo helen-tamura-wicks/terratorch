@@ -148,7 +148,7 @@ if [ -n "$MODELS_FIT_TEST" ]; then
             JOB_NAME="tt_${USER}_${TEST_NAME}"
             
             JOB_ID=$(bsub -gpu "num=1" -R "rusage[cpu=8, mem=32GB]" \
-                 -w "done($MODELS_FIT_JOB_ID)" \
+                 -w "ended($MODELS_FIT_JOB_ID)" \
                  -J "$JOB_NAME" \
                  -o "$LOG_DIR/${TEST_NAME}.log" \
                  -e "$LOG_DIR/${TEST_NAME}.err" \
