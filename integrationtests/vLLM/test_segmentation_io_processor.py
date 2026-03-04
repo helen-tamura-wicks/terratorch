@@ -97,7 +97,10 @@ def test_custom_out_path_override(get_server, model_name, image_name):
     server = get_server(model, server_args=server_args)
 
     # Create a custom output directory with automatic cleanup
-    with tempfile.TemporaryDirectory() as custom_output_dir:
+    # In some systems /tmp might not we writable but we assume the user
+    # can always write in the current directory.
+    curr_dir = Path.cwd()
+    with tempfile.TemporaryDirectory(dir=curr_dir) as custom_output_dir:
         request_payload = {
             "data": {
                 "data": image_url,
@@ -177,7 +180,10 @@ def test_custom_out_path_validation(get_server, model_name, image_name):
     assert ret.status_code != 200, "Expected error for non-existent path"
 
     # Test 2: Non-writable path should raise an error
-    with tempfile.TemporaryDirectory() as tmpdir:
+    # In some systems /tmp might not we writable but we assume the user
+    # can always write in the current directory.
+    curr_dir = Path.cwd()
+    with tempfile.TemporaryDirectory(dir=curr_dir) as tmpdir:
         readonly_dir = Path(tmpdir) / "readonly"
         readonly_dir.mkdir()
 
