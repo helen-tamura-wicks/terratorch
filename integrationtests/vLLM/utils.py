@@ -76,7 +76,8 @@ def server():
 
         def init_server(self, model_name, **kwargs):
             self._delete_server()
-            self.tmpdir = tempfile.TemporaryDirectory()
+            curr_dir = Path.cwd()
+            self.tmpdir = tempfile.TemporaryDirectory(dir=curr_dir)
             plugin_config = {"output_path": self.tmpdir.name}
             server_envs = {
                 "TERRATORCH_SEGMENTATION_IO_PROCESSOR_CONFIG": json.dumps(plugin_config),
