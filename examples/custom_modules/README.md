@@ -66,10 +66,9 @@ This tells TerraTorch to import your package and resolve `HelloGeoModule` from t
 
 ## Use TERRATORCH_CUSTOM_MODULE_PATH environment variable to specify an alternative path to your custom modules.
 
-To set a different path for your custom modules, you can use the `TERRATORCH_CUSTOM_MODULE_PATH` environment variable. For example:
+To set a different path for your custom modules, you can use the `TERRATORCH_CUSTOM_MODULE_PATH` environment variable. The `custom_modules_path` field in your config.yaml will take precedence over this environment variable, so ensure it is present or set to None if you wish to specify an alternative path this way. For example:
 
 ```
  os.environ["TERRATORCH_CUSTOM_MODULE_PATH"] = "examples/custom_modules_alternative/custom_modules
- terratorch fit -c "./config.yaml"
+ terratorch fit -c "./config.yaml" # config.yaml should not set `custom_modules_path`.
  ```
-
