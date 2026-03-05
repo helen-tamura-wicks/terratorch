@@ -514,13 +514,29 @@ class MyLightningCLI(LightningCLI):
             config = self.config
 
         # Custom modules path
-        if hasattr(self.config, "fit") and hasattr(self.config.fit, "custom_modules_path"):
+        if (
+            hasattr(self.config, "fit")
+            and hasattr(self.config.fit, "custom_modules_path")
+            and (self.config.fit.custom_modules_path is not None)
+        ):
             custom_modules_path = self.config.fit.custom_modules_path
-        elif hasattr(self.config, "validate") and hasattr(self.config.validate, "custom_modules_path"):
+        elif (
+            hasattr(self.config, "validate")
+            and hasattr(self.config.validate, "custom_modules_path")
+            and (self.config.validate.custom_modules_path is not None)
+        ):
             custom_modules_path = self.config.validate.custom_modules_path
-        elif hasattr(self.config, "test") and hasattr(self.config.test, "custom_modules_path"):
+        elif (
+            hasattr(self.config, "test")
+            and hasattr(self.config.test, "custom_modules_path")
+            and (self.config.test.custom_modules_path is not None)
+        ):
             custom_modules_path = self.config.test.custom_modules_path
-        elif hasattr(self.config, "predict") and hasattr(self.config.predict, "custom_modules_path"):
+        elif (
+            hasattr(self.config, "predict")
+            and hasattr(self.config.predict, "custom_modules_path")
+            and (self.config.predict.custom_modules_path is not None)
+        ):
             custom_modules_path = self.config.predict.custom_modules_path
         else:
             custom_modules_path = os.getenv("TERRATORCH_CUSTOM_MODULE_PATH", None)
