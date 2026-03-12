@@ -1,4 +1,4 @@
-from typing import Union
+
 import warnings
 from terratorch.registry import TERRATORCH_FULL_MODEL_REGISTRY
 
@@ -27,7 +27,7 @@ __all__ = [
 
 @TERRATORCH_FULL_MODEL_REGISTRY.register
 def terracodec_v1_fp_s2l2a(
-    compression: Union[str, float, int] = "lambda-10",
+    compression: str | float | int = "lambda-10",
     image_size: int = 256,
     mode="eval",
     **kwargs,
@@ -44,7 +44,7 @@ def terracodec_v1_fp_s2l2a(
 
 @TERRATORCH_FULL_MODEL_REGISTRY.register
 def terracodec_v1_elic_s2l2a(
-    compression: Union[str, float, int] = "lambda-10",
+    compression: str | float | int = "lambda-10",
     image_size: int = 256,
     mode="eval",
     **kwargs,
@@ -61,7 +61,7 @@ def terracodec_v1_elic_s2l2a(
 
 @TERRATORCH_FULL_MODEL_REGISTRY.register
 def terracodec_v1_tt_s2l2a(
-    compression: Union[str, float, int] = "lambda-5",
+    compression: str | float | int = "lambda-5",
     image_size: int = 256,
     mode="eval",
     **kwargs,
@@ -78,7 +78,7 @@ def terracodec_v1_tt_s2l2a(
 
 @TERRATORCH_FULL_MODEL_REGISTRY.register
 def terracodec_v1_tt_s2l1c(
-    compression: Union[str, float, int] = "lambda-20",
+    compression: str | float | int = "lambda-20",
     image_size: int = 256,
     mode="eval",
     **kwargs,
@@ -95,7 +95,7 @@ def terracodec_v1_tt_s2l1c(
 
 @TERRATORCH_FULL_MODEL_REGISTRY.register
 def flextec_v1_s2l2a(
-    compression: Union[str, float, int] = "lambda-800",
+    compression: str | float | int = "lambda-800",
     image_size: int = 256,
     mode="eval",
     lr_only: bool = False,
