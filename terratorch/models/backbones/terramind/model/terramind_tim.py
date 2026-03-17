@@ -196,7 +196,7 @@ class TerraMindTiM(nn.Module):
         self.output_mod_name_mapping.update({v: k for k, v in tim_decoder_name_mapping.items()})
 
         # Build TiM model
-        mae_model = TerraMind(
+        enc_dec_model = TerraMind(
             encoder_embeddings=tim_encoder_embeddings,
             decoder_embeddings=tim_decoder_embeddings,
             modality_info=MODALITY_INFO,
@@ -214,10 +214,10 @@ class TerraMindTiM(nn.Module):
             qk_norm=qk_norm,
             num_register_tokens=num_register_tokens,
         )
-        # No fine-tuning of the mae model
-        mae_model = mae_model.requires_grad_(False)
+        # No fine-tuning of the encoder decoder model
+        enc_dec_model = enc_dec_model.requires_grad_(False)
 
-        self.sampler = GenerationSampler(mae_model)
+        self.sampler = GenerationSampler(enc_dec_model)
 
         self.img_size = img_size
         self.merge_method = merge_method
