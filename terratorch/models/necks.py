@@ -353,7 +353,15 @@ class LearnedInterpolateToPyramidal(Neck):
         self.fpn4 = nn.Sequential(nn.MaxPool2d(kernel_size=2, stride=2))
         self.embedding_dim = [channel_list[0] // 4, channel_list[1] // 2, channel_list[2], channel_list[3]]
 
+        if torch.mps.is_available():
+            warnings.warn("MPS backend: enforcing .contiguous() to avoid non‑contiguous tensor issues "
+                          "on M‑series chips; may cause extra copies and slower execution.")
+
     def forward(self, features: list[torch.Tensor], **kwargs) -> list[torch.Tensor]:
+        if torch.mps.is_available():
+            # Fix issue on MacBooks
+            features = [f.contiguous() for f in features]
+
         scaled_inputs = []
         scaled_inputs.append(self.fpn1(features[0]))
         scaled_inputs.append(self.fpn2(features[1]))
