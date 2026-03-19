@@ -95,6 +95,8 @@ class TerraMindTiM(nn.Module):
             ints (num_channels of modality) or nn.Module (patch embedding layer).
         tim_modalities (list, optional): List of tokenized modalities used for the TiM approach. The TiM outputs are
             generated in the same order as specified in the given list. Defaults to [LULC].
+        tim_chained_generations (bool): If True, uses generated modalities as conditions for following TiM modalities.
+            If False, generates all modalities only based on inputs. Defaults to True.
         tim_decoding_steps (int): Number of decoding steps for each TiM modality. Defaults to 1.
         tim_temps (float): Sampling temperature for each TiM modality. Defaults to 1.0.
         tim_top_p (float): Top-p sampling threshold for TiM modalities. Ignored if set to 0.0. Defaults to 0.8.
@@ -131,11 +133,11 @@ class TerraMindTiM(nn.Module):
             img_size: int = 224,
             modalities: list[str] | dict[str, int | nn.Module] | None = None,
             tim_modalities: list[str] | None = None,
+            tim_chained_generations: bool = True,
             tim_decoding_steps: int = 1,
             tim_temps: float = 1.0,
             tim_top_p: float = 0.8,
             tim_top_k: int = 0,
-            tim_chained_generations: bool = False,
             merge_method: str | None = 'mean',
             patch_size: int = 16,
             in_chans: int = 3,
