@@ -95,6 +95,8 @@ class TerraMindTiM(nn.Module):
             ints (num_channels of modality) or nn.Module (patch embedding layer).
         tim_modalities (list, optional): List of tokenized modalities used for the TiM approach. The TiM outputs are
             generated in the same order as specified in the given list. Defaults to [LULC].
+        tim_chained_generations (bool): If True, uses generated modalities as conditions for following TiM modalities.
+            If False, generates all modalities only based on inputs. Defaults to True.
         tim_decoding_steps (int): Number of decoding steps for each TiM modality. Defaults to 1.
         tim_temps (float): Sampling temperature for each TiM modality. Defaults to 1.0.
         tim_top_p (float): Top-p sampling threshold for TiM modalities. Ignored if set to 0.0. Defaults to 0.8.
@@ -131,6 +133,7 @@ class TerraMindTiM(nn.Module):
             img_size: int = 224,
             modalities: list[str] | dict[str, int | nn.Module] | None = None,
             tim_modalities: list[str] | None = None,
+            tim_chained_generations: bool = True,
             tim_decoding_steps: int = 1,
             tim_temps: float = 1.0,
             tim_top_p: float = 0.8,
@@ -175,15 +178,19 @@ class TerraMindTiM(nn.Module):
         self.tim_top_p = tim_top_p
         self.tim_top_k = tim_top_k
 
-        # Init embeddings for TiM model
-        self.tim_encoder_embeddings, _ = build_modality_embeddings(
-            MODALITY_INFO, modalities, img_size=img_size, dim=dim, patch_size=patch_size)
-        tim_decoder_embeddings, tim_decoder_name_mapping = build_output_modality_embeddings(
-            MODALITY_INFO, self.tim_modalities, img_size=img_size, dim=dim, patch_size=patch_size)
-
         # Build embedding layers for encoder (modalities and tim_modalities as inputs)
         mod_embeddings, mod_name_mapping = build_tim_modality_embeddings(
             modalities, self.tim_modalities, img_size=img_size, dim=dim, patch_size=patch_size)
+
+        # Init embeddings for TiM model
+        if tim_chained_generations:
+            tim_encoder_embeddings = mod_embeddings
+        else:
+            tim_encoder_embeddings, _ = build_modality_embeddings(
+                MODALITY_INFO, modalities, img_size=img_size, dim=dim, patch_size=patch_size)
+        tim_decoder_embeddings, tim_decoder_name_mapping = build_output_modality_embeddings(
+            MODALITY_INFO, self.tim_modalities, img_size=img_size, dim=dim, patch_size=patch_size)
+
         self.encoder_embeddings = nn.ModuleDict(mod_embeddings)
         self.mod_name_mapping = mod_name_mapping
         self.modalities = list(mod_name_mapping.keys())  # Further code expects list
@@ -191,8 +198,8 @@ class TerraMindTiM(nn.Module):
         self.output_mod_name_mapping.update({v: k for k, v in tim_decoder_name_mapping.items()})
 
         # Build TiM model
-        mae_model = TerraMind(
-            encoder_embeddings=self.tim_encoder_embeddings,
+        enc_dec_model = TerraMind(
+            encoder_embeddings=tim_encoder_embeddings,
             decoder_embeddings=tim_decoder_embeddings,
             modality_info=MODALITY_INFO,
             dim=dim,
@@ -209,10 +216,10 @@ class TerraMindTiM(nn.Module):
             qk_norm=qk_norm,
             num_register_tokens=num_register_tokens,
         )
-        # No fine-tuning of the mae model
-        mae_model = mae_model.requires_grad_(False)
+        # No fine-tuning of the encoder decoder model
+        enc_dec_model = enc_dec_model.requires_grad_(False)
 
-        self.sampler = GenerationSampler(mae_model)
+        self.sampler = GenerationSampler(enc_dec_model)
 
         self.img_size = img_size
         self.merge_method = merge_method
