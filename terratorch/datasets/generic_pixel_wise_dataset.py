@@ -227,7 +227,14 @@ class GenericPixelWiseDataset(NonGeoDataset, ABC):
                 image = rearrange(image, "(time channels) h w -> channels time h w", channels=len(self.dataset_bands))
         image = np.moveaxis(image, 0, -1)
         if self.filter_indices:
-            image = image[..., self.filter_indices]
+
+            if len(self.filter_indices) <= image.shape[-1]: # if requested bands are less than data band number, filter as normal
+                image = image[..., self.filter_indices]
+            elif len(self.filter_indices) > image.shape[-1]: # if requested bands are more than data band number, append with empty bands at the end
+                dim_diff = len(self.filter_indices) - image.shape[-1]
+                image_padding = np.zeros((image.shape[0], image.shape[1], dim_diff))
+                image = np.concat([image, image_padding], axis=-1)
+
         output = {
             "image": image.astype(np.float32) * self.constant_scale,
         }
